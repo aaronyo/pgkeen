@@ -1,0 +1,19 @@
+{
+  "name": "pgeasy",
+  "version": "0.0.1",
+  "description": "A minimal, promise based api that simplifies use of node pg and adds a couple features typically found in db drivers, like transactions.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aaronyo/pgeasy.git"
+  },
+  "author": "Aaron Boyd",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aaronyo/pgeasy/issues"
+  },
+  "homepage": "https://github.com/aaronyo/pgeasy#readme"
+}
