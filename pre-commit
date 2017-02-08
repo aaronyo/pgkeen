@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# jshint
+echo ""
+echo "pre-commit hook: eslint"
+echo ""
+./node_modules/eslint/bin/eslint.js `git diff --diff-filter=AM --name-only --cached | grep .js$` || exit 1
