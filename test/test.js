@@ -196,147 +196,45 @@ suite('Client', () => {
       });
   });
 
-  return;
-
-  test('raw connection does not auto rollback', function(done) {
-    db = createDb({ poolSize: 1 });
-    var inserting = db.connection(function(conn) {
-      var querying = conn.query('INSERT INTO foo VALUES (DEFAULT);');
-      var erroring = Promise.reject('error');
-      return Promise.all([querying, erroring]);
-    });
-
-    inserting
-      .catch(function() {
-        return db.query('SELECT count(*) from foo;').then(function(result) {
-          assert.equal(result[0].count, '1');
-          done();
-        });
+  test('raw connection does not auto rollback', () => {
+    db = new Client({ pool: { max: 1 } });
+    return db
+      .connection(conn => {
+        return conn
+          .query('INSERT INTO foo VALUES (DEFAULT);')
+          .then(() => conn.query('bogus'));
       })
-      .catch(done);
-  });
-
-  test('prepare a statement', function(done) {
-    db = createDb({ poolSize: 10 });
-
-    db.loadStatement(__dirname + '/test_query.sql').then(function(statement) {
-      return db
-        .query('INSERT INTO foo VALUES (1), (2), (3), (4);')
-        .then(function() {
-          return db.exec(statement, 2);
-        })
-        .then(function(result) {
-          assert.equal(result.length, 2);
-          done();
-        })
-        .catch(done);
-    });
-  });
-
-  test('prepare all statements in a directory', function(done) {
-    db = createDb({ loadpath: __dirname, poolSize: 10 });
-
-    var statements = db
-      .loadStatements(__dirname + '/test_sql')
-      .then(function(statements) {
-        return db
-          .exec(statements.select1)
-          .then(function(rows) {
-            assert.equal(rows[0].one, 1);
-          })
-          .then(function() {
-            return db.execTemplate(statements.select2);
-          })
-          .then(function(rows) {
-            assert.equal(rows[0].two, 2);
-          })
-          .then(done, done);
+      .catch(() => {
+        return db.query('SELECT count(*) from foo;').then(result => {
+          assert.equal(result[0].count, '1');
+        });
       });
   });
 
-  test('parseNamedParams', function() {
-    var text = '--' + '-- $1: foo' + '-- $2: bar' + '--';
+  test('write then read consistency', () => {
+    db = new Client({ pool: { max: 10 } });
+    let counter = 0;
 
-    var actual = client.parseNamedParams(text);
-    assert.equal(actual[0], 'foo');
-    assert.equal(actual[1], 'bar');
-  });
+    const update = 'UPDATE fooid SET bar = bar+1 WHERE id = 0;';
+    const select = 'SELECT * from fooid;';
+    return db.query('INSERT INTO fooid VALUES (0, 0);').then(() => {
+      function again() {
+        if (counter === 10) return null;
 
-  test('prepare statemnt with named args', function(done) {
-    db = createDb({ poolSize: 10 });
-
-    db
-      .loadStatement(__dirname + '/select_named_args.sql')
-      .then(function(statement) {
-        return db.exec(statement, {
-          foo: 'F',
-          bar: 'B'
+        return Promise.all([
+          db.query(update),
+          db.query(update),
+          db.query(update),
+          db.query(update)
+        ]).then(() => {
+          return db.query(select).then(result => {
+            assert.equal(result[0].bar, (counter + 1) * 4);
+            counter += 1;
+            return again(db);
+          });
         });
-      })
-      .then(function(rows) {
-        assert.equal(rows[0].foo, 'F');
-        assert.equal(rows[0].bar, 'B');
-      })
-      .then(done, done);
-  });
-
-  test('prepare a statement from a template', function(done) {
-    db = createDb({ poolSize: 10 });
-
-    db
-      .loadStatement(__dirname + '/test_query_template.sql.hbs')
-      .then(function(statement) {
-        return db
-          .query('INSERT INTO foo VALUES (1), (2), (3), (4);')
-          .then(function() {
-            return db.execTemplate(statement, { direction: 'DESC' }, 2);
-          })
-          .then(function(result) {
-            assert.equal(result.length, 2);
-            assert.equal(result[0].bar, 4);
-            assert.equal(result[1].bar, 3);
-            done();
-          });
-      })
-      .catch(done);
-  });
-
-  test('db.exec: write then read consistency', function(done) {
-    db = createDb({ loadpath: __dirname, poolSize: 10 });
-    var counter = 0;
-
-    var update = 'UPDATE fooid SET bar = bar+1 WHERE id = 0;';
-    var select = 'SELECT * from fooid;';
-    return db
-      .query('INSERT INTO fooid VALUES (0, 0);')
-      .then(function() {
-        function again(db) {
-          if (counter === 10) return;
-
-          return Promise.all([
-            db.exec(update),
-            db.exec(update),
-            db.exec(update),
-            db.exec(update)
-          ]).then(function() {
-            return db.exec(select).then(function(result) {
-              assert.equal(result[0].bar, (counter + 1) * 4);
-              counter += 1;
-              return again(db);
-            });
-          });
-        }
-        return again(db);
-      })
-      .catch(function(err) {
-        console.log(err.cause);
-        throw err;
-      })
-      .then(
-        function() {
-          done();
-        },
-        done
-      );
+      }
+      return again(db);
+    });
   });
 });
