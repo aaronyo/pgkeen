@@ -7,11 +7,11 @@ const parseUrl = require('pg-connection-string').parse;
 const Pool = require('pg').Pool;
 
 // Features:
-// 1) Simpler pool semantics
-// 2) Simpler transaction semantics
-// 3) psql like named parameters
-// 4) query(), queryFirst, queryRaw()
-// 5) Event hook for logging
+// 1) Safer pool semantics
+// 2) Safer transaction semantics
+// 4) queryFirst()
+// 5) Event hooks for logging
+// 6) Optional column camelizing
 
 function makePool(hostConfig, poolConfig) {
   const pgPool = new Pool(fp.extend(hostConfig, poolConfig));
