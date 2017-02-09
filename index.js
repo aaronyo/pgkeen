@@ -1,9 +1,9 @@
 const assert = require('assert');
-const EventEmitter = require('events').EventEmitter();
+const EventEmitter = require('events').EventEmitter;
 
 const fp = require('lodash/fp');
 const Promise = require('bluebird');
-const parseUrl = require('pg-connection-string').parseUrl;
+const parseUrl = require('pg-connection-string').parse;
 const Pool = require('pg').Pool;
 
 // Features:
@@ -14,18 +14,18 @@ const Pool = require('pg').Pool;
 // 5) Event hook for logging
 
 function makePool(hostConfig, poolConfig) {
-  const pgPool = Promise.promisifyAll(new Pool(
-    fp.extend(hostConfig, poolConfig)
-  ));
+  const pgPool = new Pool(fp.extend(hostConfig, poolConfig));
 
   function useConnection(fn) {
-    return pgPool.connectAsync().spread((pgConn, release) => {
-      return Promise.try(fn, pgConn).finally(release);
-    });
+    return Promise.resolve(
+      pgPool.connect().then(conn => {
+        return Promise.try(fn, conn).finally(conn.release);
+      })
+    );
   }
 
   function close() {
-    return pgPool.endAsync();
+    return Promise.resolve(pgPool.end());
   }
 
   return { useConnection, close };
@@ -80,14 +80,14 @@ class Connection {
 
   query(...args) {
     return this.queryRaw(...args).then(results => {
-      return results && results.length
-        ? formatRows(this.camelizeColumns, results)
+      return results.rows.length
+        ? formatRows(this.camelizeColumns, results.rows)
         : null;
     });
   }
 
   queryFirst(...args) {
-    return this.query(...args).then(fp.first);
+    return this.query(...args).then(([row]) => row);
   }
 
   // Returns a promise for work completed within the
@@ -127,7 +127,7 @@ class Connection {
 class Client {
   constructor(
     {
-      url = 'postgres://localhost:5432',
+      url = 'postgres://localhost:5432/postgres',
       host = null,
       pool = { max: 1 },
       camelizeColumns = false,
@@ -142,7 +142,7 @@ class Client {
       ([eventName, listener]) => {
         this.emitter.on(eventName, listener);
       },
-      fp.pairs(eventListeners)
+      fp.toPairs(eventListeners)
     );
   }
 
