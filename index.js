@@ -16,7 +16,7 @@ const Pool = require('pg').Pool;
 function makePool(hostConfig, poolConfig) {
   const pgPool = new Pool(fp.extend(hostConfig, poolConfig));
 
-  function useConnection(fn) {
+  function connection(fn) {
     return Promise.resolve(
       pgPool.connect().then(conn => {
         return Promise.try(fn, conn).finally(conn.release);
@@ -28,7 +28,7 @@ function makePool(hostConfig, poolConfig) {
     return Promise.resolve(pgPool.end());
   }
 
-  return { useConnection, close };
+  return { connection, close };
 }
 
 function doCamelizeColumns(rows) {
@@ -146,8 +146,8 @@ class Client {
     );
   }
 
-  useConnection(fn) {
-    return this.pool.useConnection(pgConn => {
+  connection(fn) {
+    return this.pool.connection(pgConn => {
       return Promise.try(() => {
         const onResult = fn(new Connection(
           pgConn,
@@ -170,19 +170,19 @@ class Client {
   // Connection methods are just passed through to the corresponding
   // connection method
   queryRaw(...args) {
-    return this.useConnection(conn => conn.queryRaw(...args));
+    return this.connection(conn => conn.queryRaw(...args));
   }
 
   query(...args) {
-    return this.useConnection(conn => conn.query(...args));
+    return this.connection(conn => conn.query(...args));
   }
 
   queryFirst(...args) {
-    return this.useConnection(conn => conn.queryFirst(...args));
+    return this.connection(conn => conn.queryFirst(...args));
   }
 
   transaction(...args) {
-    return this.useConnection(conn => conn.transaction(...args));
+    return this.connection(conn => conn.transaction(...args));
   }
 
   close() {
