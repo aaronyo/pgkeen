@@ -63,7 +63,11 @@ class Connection {
     return this.pgConn();
   }
 
-  queryRaw(sql, ...vals) {
+  queryRaw(sql, vals) {
+    if (!fp.isString(sql)) {
+      sql = sql.text;
+      vals = sql.vals;
+    }
     this.emitter.emit('query', sql, vals);
     return new Promise((resolve, reject) => {
       this.pgConn.query(sql, vals, (err, result) => {
@@ -74,7 +78,7 @@ class Connection {
         resolve(result);
       });
     }).tap(result => {
-      this.emitter.emit('queryResult', sql, vals, result);
+      this.emitter.emit('result', sql, vals, result);
     });
   }
 
