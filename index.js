@@ -94,20 +94,6 @@ class Connection {
     return this.query(...args).then(([row]) => row);
   }
 
-  // Returns a promise for work completed within the
-  // scope of a single transaction.
-  //
-  // You supply a function which receives a connection and
-  // returns a promise.
-  //
-  // The transaction has already been opened on the connection,
-  // and it will automatically be committed once your promise
-  // completes.
-  //
-  // NOTE: You should only use this function if you require
-  // multiple statements to be executed within a single transaction.
-  // Generally try to avoid this.  You must understand locking
-  // (and deadlocking) in postgres before using this.
   transaction(fn) {
     this.query('BEGIN');
 
@@ -158,10 +144,6 @@ class Client {
           this.camelizeColumns,
           this.emitter
         ));
-        // I can't think of a reason that a function of connection would
-        // not want to return a promise, because a connection should not
-        // be released until it's work is completed, so adding this safety
-        // belt.
         assert(
           fp.isFunction(onResult.then),
           'Function of connection must return a promise'
