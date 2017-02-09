@@ -155,25 +155,19 @@ class Client {
 
   // Connection methods are just passed through to the corresponding
   // connection method
-  queryRaw(...args) {
-    return this.connection(conn => conn.queryRaw(...args));
-  }
-
-  query(...args) {
-    return this.connection(conn => conn.query(...args));
-  }
-
-  queryFirst(...args) {
-    return this.connection(conn => conn.queryFirst(...args));
-  }
-
-  transaction(...args) {
-    return this.connection(conn => conn.transaction(...args));
-  }
-
   close() {
     return this.pool.close();
   }
 }
+
+fp.each(
+  method => {
+    // eslint-disable-next-line func-names
+    Client.prototype[method] = function(...args) {
+      return this.connection(conn => conn[method](...args));
+    };
+  },
+  ['queryRaw', 'query', 'queryFirst', 'transaction']
+);
 
 module.exports = { Client };

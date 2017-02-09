@@ -5,6 +5,7 @@
   "rules": {
     "no-restricted-globals": ["error", "Promise"],
     "newline-per-chained-call": "off",
+    "space-before-function-paren": "off",
     "comma-dangle": "off",
     "curly": "off",
     "indent": "off",
