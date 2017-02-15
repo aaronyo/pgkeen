@@ -6,15 +6,6 @@ const Promise = require('bluebird');
 const parseUrl = require('pg-connection-string').parse;
 const Pool = require('pg').Pool;
 
-// Features:
-// 1) Auto release pool connections
-// 2) Auto commit or rollback transaction
-// 3) queryFirst()
-// 4) Event hooks for logging
-// 5) Optional column camelizing
-
-// Questions: How do we support yield inside .connection() and .transaction()
-
 function makePool(hostConfig, poolConfig) {
   const pgPool = new Pool(fp.extend(hostConfig, poolConfig));
 
