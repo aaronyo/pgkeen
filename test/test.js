@@ -7,8 +7,6 @@ const fp = require('lodash/fp');
 const Client = require('../index.js').Client;
 const assert = require('assert');
 
-const _ = null;
-
 suite('Client', () => {
   let db;
 

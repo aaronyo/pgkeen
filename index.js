@@ -7,11 +7,13 @@ const parseUrl = require('pg-connection-string').parse;
 const Pool = require('pg').Pool;
 
 // Features:
-// 1) Safer pool semantics
-// 2) Safer transaction semantics
-// 4) queryFirst()
-// 5) Event hooks for logging
-// 6) Optional column camelizing
+// 1) Auto release pool connections
+// 2) Auto commit or rollback transaction
+// 3) queryFirst()
+// 4) Event hooks for logging
+// 5) Optional column camelizing
+
+// Questions: How do we support yield inside .connection() and .transaction()
 
 function makePool(hostConfig, poolConfig) {
   const pgPool = new Pool(fp.extend(hostConfig, poolConfig));
