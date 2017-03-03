@@ -25,20 +25,7 @@ function makePool(hostConfig, poolConfig) {
 }
 
 function doCamelizeColumns(rows) {
-  const keys = fp.map(fp.camelCase, fp.keys(rows[0]));
-  return fp.reduce(
-    (result, row) => {
-      fp.times(
-        i => {
-          result[keys[i]] = row[i];
-        },
-        keys.length
-      );
-      return result;
-    },
-    {},
-    rows
-  );
+  return fp.map(fp.mapKeys(fp.camelCase), rows);
 }
 
 function formatRows(camelizeColumns, rows) {
