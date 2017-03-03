@@ -58,18 +58,18 @@ suite('Client', () => {
     let result;
     db = new Client({
       eventListeners: {
-        query: (q, r) => {
-          query = [q, r];
+        query: (args) => {
+          query = args;
         },
-        result: (q, v, r) => {
-          result = [q, v, r];
+        result: (args, r) => {
+          result = [args, r];
         }
       }
     });
     return db.query('select 1 as num limit $1', [2]).then(() => {
       assert.deepEqual(query, ['select 1 as num limit $1', [2]]);
-      assert.deepEqual(result.slice(0, 2), query);
-      assert.deepEqual(result[2].rows, [{ num: 1 }]);
+      assert.deepEqual(result[0], query);
+      assert.deepEqual(result[1].rows, [{ num: 1 }]);
     });
   });
 
