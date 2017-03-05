@@ -62,7 +62,7 @@ class Connection {
     return this.queryRaw(...args).then(results => {
       return results.rows.length
         ? formatRows(this.camelizeColumns, results.rows)
-        : null;
+        : [];
     });
   }
 

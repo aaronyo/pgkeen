@@ -14,7 +14,7 @@ suite('Client', () => {
     return db
       .connection(conn => {
         return Promise.all([
-          conn.query('CREATE TABLE foo (bar int);'),
+          conn.query('CREATE TABLE foo (foo_bar int);'),
           conn.query('CREATE TABLE fooid (id int, bar int);')
         ]);
       })
@@ -79,11 +79,34 @@ suite('Client', () => {
       .query('INSERT INTO foo VALUES ($1)', [1])
       .then(() => db.query('SELECT * from foo;'))
       .then(([row]) => {
-        assert.equal(row.bar, 1);
+        assert.equal(row.foo_bar, 1);
       })
       .then(() => db.queryFirst('SELECT * from foo;'))
       .then(row => {
-        assert.equal(row.bar, 1);
+        assert.equal(row.foo_bar, 1);
+      });
+  });
+
+  test('camelizeColumns', () => {
+    db = new Client({ pool: { max: 1 }, camelizeColumns: true});
+    return db
+      .query('INSERT INTO foo VALUES (1)')
+      .then(() => db.queryFirst('SELECT * from foo;'))
+      .then((row) => {
+        assert.equal(row.fooBar, 1);
+      });
+  });
+
+  test('Select nothing', () => {
+    db = new Client({ pool: { max: 1 } });
+    return db
+      .query('SELECT * from foo;')
+      .then((rows) => {
+        assert.equal(rows.length, 0);
+      })
+      .then(() => db.queryFirst('SELECT * from foo;'))
+      .then(row => {
+        assert.equal(row, undefined);
       });
   });
 
