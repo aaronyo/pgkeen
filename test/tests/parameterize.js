@@ -7,7 +7,7 @@ const fp = require('lodash/fp');
 const { extractParams, parameterize } = require('../../lib/parameterize');
 const assert = require('assert');
 
-suite('SQL Strings', () => {
+suite('Parameterized queries', () => {
   test('Extract params', async () => {
     assert.deepEqual(extractParams('SELECT 1 FROM foo WHERE val = :val'), {
       text: 'SELECT 1 FROM foo WHERE val = $1',
