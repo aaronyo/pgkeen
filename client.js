@@ -13,7 +13,7 @@ function makePool(hostConfig, poolConfig) {
     return Promise.resolve(
       pgPool.connect().then(conn => {
         return Promise.try(fn, conn).finally(conn.release);
-      })
+      }),
     );
   }
 
@@ -77,7 +77,7 @@ class Connection {
       const onResult = fn(this);
       assert(
         fp.isFunction(onResult.then),
-        'Transaction function must return a promise'
+        'Transaction function must return a promise',
       );
       return onResult.then(result => {
         return this.query('END').then(() => result);
@@ -97,32 +97,27 @@ class Client {
       host = null,
       pool = { max: 1 },
       camelizeColumns = false,
-      eventListeners = {}
-    } = {}
+      eventListeners = {},
+    } = {},
   ) {
     host = host || parseUrl(url);
     this.pool = makePool(host, pool);
     this.camelizeColumns = camelizeColumns;
     this.emitter = new EventEmitter();
-    fp.each(
-      ([eventName, listener]) => {
-        this.emitter.on(eventName, listener);
-      },
-      fp.toPairs(eventListeners)
-    );
+    fp.each(([eventName, listener]) => {
+      this.emitter.on(eventName, listener);
+    }, fp.toPairs(eventListeners));
   }
 
   connection(fn) {
     return this.pool.connection(pgConn => {
       return Promise.try(() => {
-        const onResult = fn(new Connection(
-          pgConn,
-          this.camelizeColumns,
-          this.emitter
-        ));
+        const onResult = fn(
+          new Connection(pgConn, this.camelizeColumns, this.emitter),
+        );
         assert(
           fp.isFunction(onResult.then),
-          'Function of connection must return a promise'
+          'Function of connection must return a promise',
         );
         return onResult;
       });
@@ -143,7 +138,7 @@ fp.each(
       return this.connection(conn => conn[method](...args));
     };
   },
-  ['queryRaw', 'query', 'queryFirst', 'transaction']
+  ['queryRaw', 'query', 'queryFirst', 'transaction'],
 );
 
 module.exports = Client;
