@@ -4,7 +4,7 @@ const Promise = require('bluebird');
 Promise.config({ longStackTraces: true });
 
 const fp = require('lodash/fp');
-const Client = require('../index.js').Client;
+const Client = require('../../lib/client.js');
 const assert = require('assert');
 
 suite('Client', () => {
@@ -15,7 +15,7 @@ suite('Client', () => {
       .connection(conn => {
         return Promise.all([
           conn.query('CREATE TABLE foo (foo_bar int);'),
-          conn.query('CREATE TABLE fooid (id int, bar int);')
+          conn.query('CREATE TABLE fooid (id int, bar int);'),
         ]);
       })
       .then(fp.noop);
@@ -26,7 +26,7 @@ suite('Client', () => {
       .connection(conn => {
         return Promise.all([
           conn.query('DROP TABLE IF EXISTS foo;'),
-          conn.query('DROP TABLE IF EXISTS fooid;')
+          conn.query('DROP TABLE IF EXISTS fooid;'),
         ]);
       })
       .then(fp.noop);
@@ -58,13 +58,13 @@ suite('Client', () => {
     let result;
     db = new Client({
       eventListeners: {
-        query: (args) => {
+        query: args => {
           query = args;
         },
         result: (args, r) => {
           result = [args, r];
-        }
-      }
+        },
+      },
     });
     return db.query('select 1 as num limit $1', [2]).then(() => {
       assert.deepEqual(query, ['select 1 as num limit $1', [2]]);
@@ -88,11 +88,11 @@ suite('Client', () => {
   });
 
   test('camelizeColumns', () => {
-    db = new Client({ pool: { max: 1 }, camelizeColumns: true});
+    db = new Client({ pool: { max: 1 }, camelizeColumns: true });
     return db
       .query('INSERT INTO foo VALUES (1)')
       .then(() => db.queryFirst('SELECT * from foo;'))
-      .then((row) => {
+      .then(row => {
         assert.equal(row.fooBar, 1);
       });
   });
@@ -101,7 +101,7 @@ suite('Client', () => {
     db = new Client({ pool: { max: 1 } });
     return db
       .query('SELECT * from foo;')
-      .then((rows) => {
+      .then(rows => {
         assert.equal(rows.length, 0);
       })
       .then(() => db.queryFirst('SELECT * from foo;'))
@@ -132,7 +132,7 @@ suite('Client', () => {
       Promise.delay(1000).then(() => {
         assert.equal(gotFirstConnection, true);
         assert.equal(gotSecondConnection, false);
-      })
+      }),
     ]);
   });
 
@@ -141,15 +141,12 @@ suite('Client', () => {
     const gotConnection = fp.map(() => false, fp.range(0, 10));
 
     return Promise.all(
-      fp.map(
-        i => {
-          return db.connection(() => {
-            gotConnection[i] = true;
-            return Promise.delay(20);
-          });
-        },
-        fp.range(0, 10)
-      )
+      fp.map(i => {
+        return db.connection(() => {
+          gotConnection[i] = true;
+          return Promise.delay(20);
+        });
+      }, fp.range(0, 10)),
     ).then(() => {
       assert(fp.all(fp.identity, gotConnection), 'Got all connections');
     });
@@ -158,12 +155,9 @@ suite('Client', () => {
   test("don't deadlock on sequential connection requests", () => {
     db = new Client({ poolSize: 1 });
 
-    const gotConnection = fp.map(
-      () => {
-        return false;
-      },
-      fp.range(0, 3)
-    );
+    const gotConnection = fp.map(() => {
+      return false;
+    }, fp.range(0, 3));
 
     return db
       .connection(() => {
@@ -246,7 +240,7 @@ suite('Client', () => {
           db.query(update),
           db.query(update),
           db.query(update),
-          db.query(update)
+          db.query(update),
         ]).then(() => {
           return db.query(select).then(result => {
             assert.equal(result[0].bar, (counter + 1) * 4);
