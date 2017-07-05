@@ -3,5 +3,11 @@
 # jshint
 echo ""
 echo "pre-commit hook: eslint"
+git diff --diff-filter=AM --name-only --cached | grep .js$ > /dev/null
+if [ $? -ne 0 ]; then
+    echo "  skipping - no js files to lint"
+    echo ""
+    exit 0
+fi
 echo ""
 ./node_modules/eslint/bin/eslint.js `git diff --diff-filter=AM --name-only --cached | grep .js$` || exit 1
