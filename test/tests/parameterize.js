@@ -71,4 +71,16 @@ suite('Parameterized queries', () => {
       },
     );
   });
+
+  test('Replace nested params', async () => {
+    assert.deepEqual(
+      parameterize('SELECT 1 FROM foo WHERE val = :obj.val', {
+        obj: { val: 1 },
+      }),
+      {
+        text: 'SELECT 1 FROM foo WHERE val = $1',
+        values: [1],
+      },
+    );
+  });
 });
