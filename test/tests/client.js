@@ -81,7 +81,7 @@ suite('Client', () => {
       .then(([row]) => {
         assert.equal(row.foo_bar, 1);
       })
-      .then(() => db.queryFirst('SELECT * from foo;'))
+      .then(() => db.queryOne('SELECT * from foo;'))
       .then(row => {
         assert.equal(row.foo_bar, 1);
       });
@@ -91,10 +91,25 @@ suite('Client', () => {
     db = new Client({ pool: { max: 1 }, camelizeColumns: true });
     return db
       .query('INSERT INTO foo VALUES (1)')
-      .then(() => db.queryFirst('SELECT * from foo;'))
+      .then(() => db.queryOne('SELECT * from foo;'))
       .then(row => {
         assert.equal(row.fooBar, 1);
       });
+  });
+
+  test('Throw error if queryOne returns multiple result rows', () => {
+    db = new Client({ pool: { max: 1 }, camelizeColumns: true });
+    return db
+      .query('INSERT INTO foo VALUES (1), (2)')
+      .then(() => db.queryOne('SELECT * from foo;'))
+      .then(
+        row => {
+          assert.fail(row.fooBar, 'Expected an error');
+        },
+        err => {
+          assert.equal(err.message, 'Expected 0 or 1 row');
+        },
+      );
   });
 
   test('Select nothing', () => {
@@ -104,7 +119,7 @@ suite('Client', () => {
       .then(rows => {
         assert.equal(rows.length, 0);
       })
-      .then(() => db.queryFirst('SELECT * from foo;'))
+      .then(() => db.queryOne('SELECT * from foo;'))
       .then(row => {
         assert.equal(row, undefined);
       });

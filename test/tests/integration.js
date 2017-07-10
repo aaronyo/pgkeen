@@ -35,12 +35,9 @@ suite('Integration', () => {
 
   test('Use a sql file', async () => {
     await client.query('INSERT INTO foo VALUES(:val)', { val: 1 });
-    const result = await client.queryFirst(
-      await sqlFiles.get('count_foo.sql'),
-      {
-        val: 1,
-      },
-    );
+    const result = await client.queryOne(await sqlFiles.get('count_foo.sql'), {
+      val: 1,
+    });
     assert.equal(result.count, 1);
   });
 });
