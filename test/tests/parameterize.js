@@ -99,4 +99,30 @@ suite('Parameterized queries', () => {
       },
     );
   });
+
+  test('Param as prefix for another parm', async () => {
+    assert.deepEqual(
+      parameterize(
+        'SELECT 1 FROM foo WHERE val = ANY(:foo, :bar, :fooBaz, :barBaz)',
+        { foo: 1, bar: 2, fooBaz: 3, barBaz: 4 },
+      ),
+      {
+        text: 'SELECT 1 FROM foo WHERE val = ANY($1, $2, $3, $4)',
+        values: [1, 2, 3, 4],
+      },
+    );
+  });
+
+  test('Param as path for another parm', async () => {
+    assert.deepEqual(
+      parameterize(
+        'SELECT 1 FROM foo WHERE val = ANY(:foo, :bar, :foo.baz, :bar.baz)',
+        { foo: { baz: 1 }, bar: { baz: 2 } },
+      ),
+      {
+        text: 'SELECT 1 FROM foo WHERE val = ANY($1, $2, $3, $4)',
+        values: [{ baz: 1 }, { baz: 2 }, 1, 2],
+      },
+    );
+  });
 });
