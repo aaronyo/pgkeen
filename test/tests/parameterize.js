@@ -83,4 +83,20 @@ suite('Parameterized queries', () => {
       },
     );
   });
+
+  test('Double digit params', async () => {
+    assert.deepEqual(
+      parameterize(
+        'SELECT 1 FROM foo WHERE val =' +
+          'ANY(:a, :b, :c, :d, :e, :f, :g, :h, :i, :j, :k)',
+        { a: 0, b: 0, c: 1, d: 1, e: 2, f: 2, g: 3, h: 3, i: 4, j: 4, k: 5 },
+      ),
+      {
+        text:
+          'SELECT 1 FROM foo WHERE val =' +
+          'ANY($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        values: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5],
+      },
+    );
+  });
 });
