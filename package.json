@@ -28,7 +28,7 @@
   "dependencies": {
     "bluebird": "^3.4.7",
     "lodash": "^4.17.4",
-    "pg": "^6.1.2",
+    "pg": "^7.3.0",
     "pg-connection-string": "^0.1.3"
   }
 }
