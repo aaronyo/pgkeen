@@ -15,7 +15,7 @@
     "no-console": "off",
     "prefer-template": "off",
     "no-underscore-dangle": "off",
-    "max-len": ["error", 80],
+    "max-len": "off",
     "arrow-body-style": "off"
   }
 }
