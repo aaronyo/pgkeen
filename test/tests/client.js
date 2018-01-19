@@ -58,7 +58,10 @@ suite('Client', () => {
     let result;
     db = new Client({
       eventListeners: {
-        query: args => {
+        received: args => {
+          query = args;
+        },
+        formatted: args => {
           query = args;
         },
         result: (args, r) => {
