@@ -20,7 +20,7 @@ async function makeClient({
       assert(rows.length < 2, 'Expected 0 or 1 row');
       return rows[0];
     },
-    transaction: fn => handleTransaction(pgClient, this, fn),
+    transaction: fn => handleTransaction(pgClient, client, fn),
     disconnect: () => pgClient.end(),
   };
 

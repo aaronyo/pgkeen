@@ -73,6 +73,23 @@ suite('Client Pool', () => {
       });
   });
 
+  test('Insert a row and select it -- in a transaction', () => {
+    db = defaultPool();
+    return db
+      .transaction(client => {
+        return client
+          .query('INSERT INTO foo VALUES ($1)', [1])
+          .then(() => client.queryRows('SELECT * from foo;'))
+          .then(([row]) => {
+            assert.equal(row.foo_bar, 1);
+          })
+          .then(() => client.queryOne('SELECT * from foo;'));
+      })
+      .then(row => {
+        assert.equal(row.foo_bar, 1);
+      });
+  });
+
   test('Throw error if queryOne returns multiple result rows', () => {
     db = defaultPool();
     return db
