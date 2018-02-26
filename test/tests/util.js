@@ -16,10 +16,11 @@ suite('Util', () => {
       maxClients: 10,
     });
     const completionMarkers = [];
-    await Promise.all([
+    const returns = await Promise.all([
       synchronized(dbClient, 'lockA', async () => {
         await Promise.delay(200);
         completionMarkers.push(2);
+        return 'a';
       }),
       // There's no guarantee as to which statement would obtain 'lockA'
       // first, so we stick a delay here to make it much more likely that
@@ -27,15 +28,16 @@ suite('Util', () => {
       Promise.delay(10).then(() => {
         return synchronized(dbClient, 'lockA', () => {
           completionMarkers.push(3);
-          return Promise.resolve();
+          return Promise.resolve('a');
         });
       }),
       synchronized(dbClient, 'lockB', () => {
         completionMarkers.push(1);
-        return Promise.resolve();
+        return Promise.resolve('b');
       }),
     ]);
 
+    assert.deepEqual(returns, ['a', 'a', 'b']);
     assert.deepEqual(completionMarkers, [1, 2, 3]);
   });
 });
