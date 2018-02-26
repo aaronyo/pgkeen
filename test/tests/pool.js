@@ -2,17 +2,23 @@
 const Promise = require('bluebird');
 
 Promise.config({ longStackTraces: true });
+global.Promise = Promise;
 
 const fp = require('lodash/fp');
-const Client = require('../../lib/client.js');
+const { makeClient, makePool } = require('../../index');
+const pg = require('pg');
 const assert = require('assert');
 
-suite('Client', () => {
+function defaultPool({ maxClients = 1 } = {}) {
+  return makePool({ makeClient: () => makeClient({ pg }), maxClients });
+}
+
+suite('Client Pool', () => {
   let db;
 
   function createTestTable() {
     return db
-      .connection(conn => {
+      .withClient(conn => {
         return Promise.all([
           conn.query('CREATE TABLE foo (foo_bar int);'),
           conn.query('CREATE TABLE fooid (id int, bar int);'),
@@ -23,10 +29,10 @@ suite('Client', () => {
 
   function dropTestTable() {
     return db
-      .connection(conn => {
+      .withClient(conn => {
         return Promise.all([
-          conn.query('DROP TABLE IF EXISTS foo;'),
-          conn.query('DROP TABLE IF EXISTS fooid;'),
+          conn.query('DROP TABLE IF EXISTS foo;', []),
+          conn.query('DROP TABLE IF EXISTS fooid;', []),
         ]);
       })
       .then(fp.noop);
@@ -34,13 +40,13 @@ suite('Client', () => {
 
   setup(done => {
     if (db) {
-      db.close();
+      db.drain();
     }
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     dropTestTable()
       .then(() => {
         return createTestTable().then(() => {
-          db.close();
+          db.drain();
           db = null;
           done();
         });
@@ -49,38 +55,15 @@ suite('Client', () => {
   });
 
   test('Use a db client', () => {
-    db = new Client();
+    db = defaultPool();
     return db.query('select 1');
   });
 
-  test('Event listeners', () => {
-    let query;
-    let result;
-    db = new Client({
-      eventListeners: {
-        received: args => {
-          query = args;
-        },
-        formatted: args => {
-          query = args;
-        },
-        result: (args, r) => {
-          result = [args, r];
-        },
-      },
-    });
-    return db.query('select 1 as num limit $1', [2]).then(() => {
-      assert.deepEqual(query, ['select 1 as num limit $1', [2]]);
-      assert.deepEqual(result[0], query);
-      assert.deepEqual(result[1].rows, [{ num: 1 }]);
-    });
-  });
-
   test('Insert a row and select it', () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     return db
       .query('INSERT INTO foo VALUES ($1)', [1])
-      .then(() => db.query('SELECT * from foo;'))
+      .then(() => db.queryRows('SELECT * from foo;'))
       .then(([row]) => {
         assert.equal(row.foo_bar, 1);
       })
@@ -90,24 +73,14 @@ suite('Client', () => {
       });
   });
 
-  test('camelizeColumns', () => {
-    db = new Client({ pool: { max: 1 }, camelizeColumns: true });
-    return db
-      .query('INSERT INTO foo VALUES (1)')
-      .then(() => db.queryOne('SELECT * from foo;'))
-      .then(row => {
-        assert.equal(row.fooBar, 1);
-      });
-  });
-
   test('Throw error if queryOne returns multiple result rows', () => {
-    db = new Client({ pool: { max: 1 }, camelizeColumns: true });
+    db = defaultPool();
     return db
       .query('INSERT INTO foo VALUES (1), (2)')
       .then(() => db.queryOne('SELECT * from foo;'))
       .then(
-        row => {
-          assert.fail(row.fooBar, 'Expected an error');
+        () => {
+          assert.fail('Expected an error');
         },
         err => {
           assert.equal(err.message, 'Expected 0 or 1 row');
@@ -116,9 +89,9 @@ suite('Client', () => {
   });
 
   test('Select nothing', () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     return db
-      .query('SELECT * from foo;')
+      .queryRows('SELECT * from foo;')
       .then(rows => {
         assert.equal(rows.length, 0);
       })
@@ -129,14 +102,14 @@ suite('Client', () => {
   });
 
   test('deadlock on nested connection requests', () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     let gotFirstConnection = false;
     let gotSecondConnection = false;
 
     function grab2Conns() {
-      return db.connection(() => {
+      return db.withClient(() => {
         gotFirstConnection = true;
-        return db.connection(() => {
+        return db.withClient(() => {
           gotSecondConnection = true;
           return Promise.resolve();
         });
@@ -154,13 +127,34 @@ suite('Client', () => {
     ]);
   });
 
+  test("don't deadlock when pool has enough clients", () => {
+    db = defaultPool({ maxClients: 2 });
+    let gotFirstConnection = false;
+    let gotSecondConnection = false;
+
+    function grab2Conns() {
+      return db.withClient(() => {
+        gotFirstConnection = true;
+        return db.withClient(() => {
+          gotSecondConnection = true;
+          return Promise.resolve();
+        });
+      });
+    }
+
+    return grab2Conns().then(() => {
+      assert.equal(gotFirstConnection, true);
+      assert.equal(gotSecondConnection, true);
+    });
+  });
+
   test("don't deadlock on parallel connection requests", () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     const gotConnection = fp.map(() => false, fp.range(0, 10));
 
     return Promise.all(
       fp.map(i => {
-        return db.connection(() => {
+        return db.withClient(() => {
           gotConnection[i] = true;
           return Promise.delay(20);
         });
@@ -171,25 +165,25 @@ suite('Client', () => {
   });
 
   test("don't deadlock on sequential connection requests", () => {
-    db = new Client({ poolSize: 1 });
+    db = defaultPool({ maxClients: 1 });
 
     const gotConnection = fp.map(() => {
       return false;
     }, fp.range(0, 3));
 
     return db
-      .connection(() => {
+      .withClient(() => {
         gotConnection[0] = true;
         return Promise.delay(20);
       })
       .then(() => {
-        return db.connection(() => {
+        return db.withClient(() => {
           gotConnection[1] = true;
           return Promise.delay(20);
         });
       })
       .then(() => {
-        return db.connection(() => {
+        return db.withClient(() => {
           gotConnection[2] = true;
           return Promise.delay(20);
         });
@@ -200,7 +194,7 @@ suite('Client', () => {
   });
 
   test('rollback on application exception when in transaction', () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     return db
       .transaction(conn => {
         return conn
@@ -208,14 +202,14 @@ suite('Client', () => {
           .then(() => Promise.reject('error'));
       })
       .catch(() => {
-        return db.query('SELECT count(*) from foo;').then(result => {
+        return db.queryRows('SELECT count(*) from foo;').then(result => {
           assert.equal(result[0].count, '0');
         });
       });
   });
 
   test('rollback on db error when in transaction', () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     return db
       .transaction(conn => {
         return conn
@@ -223,29 +217,29 @@ suite('Client', () => {
           .then(() => conn.query('bogus'));
       })
       .catch(() => {
-        return db.query('SELECT count(*) from foo;').then(result => {
+        return db.queryRows('SELECT count(*) from foo;').then(result => {
           assert.equal(result[0].count, '0');
         });
       });
   });
 
   test('raw connection does not auto rollback', () => {
-    db = new Client({ pool: { max: 1 } });
+    db = defaultPool();
     return db
-      .connection(conn => {
+      .withClient(conn => {
         return conn
           .query('INSERT INTO foo VALUES (DEFAULT);')
           .then(() => conn.query('bogus'));
       })
       .catch(() => {
-        return db.query('SELECT count(*) from foo;').then(result => {
+        return db.queryRows('SELECT count(*) from foo;').then(result => {
           assert.equal(result[0].count, '1');
         });
       });
   });
 
   test('write then read consistency', () => {
-    db = new Client({ pool: { max: 10 } });
+    db = defaultPool({ maxClients: 10 });
     let counter = 0;
 
     const update = 'UPDATE fooid SET bar = bar+1 WHERE id = 0;';
@@ -260,7 +254,7 @@ suite('Client', () => {
           db.query(update),
           db.query(update),
         ]).then(() => {
-          return db.query(select).then(result => {
+          return db.queryRows(select).then(result => {
             assert.equal(result[0].bar, (counter + 1) * 4);
             counter += 1;
             return again(db);
