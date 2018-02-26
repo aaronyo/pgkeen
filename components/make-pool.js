@@ -27,9 +27,10 @@ function makePool({
 
   const clientPool = {
     // Instead of returning clients, we accept a function to apply on a client
-    // and then auto release the client.
+    // and then auto release and destroy clients as necessary.
     //
-    // Requiring users to release clients inevitably leads to client leaks.
+    // Requiring users to release or destroy clients inevitably leads to client
+    // leaks and busted clients in the pool.
     withClient(fn) {
       return genericPool.acquire().then(client => {
         const onResult = fn(client);
@@ -43,7 +44,7 @@ function makePool({
             return result;
           },
           err => {
-            genericPool.release(client);
+            genericPool.destroy(client);
             throw err;
           },
         );
