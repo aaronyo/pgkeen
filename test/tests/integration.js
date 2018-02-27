@@ -6,14 +6,16 @@ global.Promise = Promise;
 
 const pg = require('pg');
 const pgkeen = require('../../index');
-const pgkeenLib = require('../../lib');
 const assert = require('assert');
 const path = require('path');
 
 const sqlFiles = pgkeen.makeSqlLoader(path.join(__dirname, 'sql'));
 
-async function handleQuery(pgClient, args) {
-  return pgkeenLib.query(pgClient, pgkeenLib.namedParamsToBindVars(...args));
+async function query({ pgClient }, ...args) {
+  return pgkeen.client.query(
+    { pgClient },
+    ...pgkeen.parameterize.namedParamsToBindVars(...args),
+  );
 }
 
 suite('Integration', () => {
@@ -32,7 +34,7 @@ suite('Integration', () => {
       pool.drain();
     }
     pool = pgkeen.makePool({
-      makeClient: () => pgkeen.makeClient({ pg, handleQuery }),
+      makeClient: () => pgkeen.makeClient({ pg, mixinMethods: { query } }),
       maxClients: 3,
     });
     await dropTestTable();

@@ -1,30 +1,21 @@
-const pgkeenLib = require('../lib');
-const assert = require('assert');
+const fp = require('lodash/fp');
+const { client: clientMethods } = require('../lib');
+const { makeComponent } = require('./helpers');
+const util = require('../lib/util');
 
 async function makeClient({
   pg,
-  handleQuery = pgkeenLib.query,
-  handleTransaction = pgkeenLib.transaction,
   url = 'postgres://localhost:5432/postgres',
+  mixinMethods = {},
 }) {
-  const pgClient = new pg.Client(pgkeenLib.parseConnectionUrl(url));
+  const pgClient = new pg.Client(util.parseConnectionUrl(url));
   pgClient.connect();
 
-  const client = {
-    query: (...args) => {
-      return handleQuery(pgClient, args);
-    },
-    queryRows: (...args) => client.query(...args).then(result => result.rows),
-    queryOne: async (...args) => {
-      const rows = await client.queryRows(...args);
-      assert(rows.length < 2, 'Expected 0 or 1 row');
-      return rows[0];
-    },
-    transaction: fn => handleTransaction(pgClient, client, fn),
-    disconnect: () => pgClient.end(),
-  };
-
-  return client;
+  return makeComponent({
+    name: 'client',
+    state: { pgClient },
+    methods: fp.assign(clientMethods, mixinMethods),
+  });
 }
 
 module.exports = makeClient;

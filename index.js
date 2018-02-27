@@ -1,2 +1,1 @@
-module.exports = require('./components');
-module.exports.synchronized = require('./lib').synchronized;
+module.exports = Object.assign({}, require('./components'), require('./lib'));
