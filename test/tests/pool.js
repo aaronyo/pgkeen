@@ -114,7 +114,7 @@ suite('Client Pool', () => {
       })
       .then(() => db.queryOne('SELECT * from foo;'))
       .then(row => {
-        assert.equal(row, undefined);
+        assert.strictEqual(row, null);
       });
   });
 
