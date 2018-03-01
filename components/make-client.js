@@ -1,5 +1,5 @@
 const fp = require('lodash/fp');
-const { client: clientMethods } = require('../lib');
+const { client: clientLib } = require('../lib');
 const { makeComponent } = require('./helpers');
 const util = require('../lib/util');
 
@@ -14,7 +14,7 @@ async function makeClient({
   return makeComponent({
     name: 'client',
     state: { pgClient },
-    methods: fp.assign(clientMethods, mixinMethods),
+    methods: fp.assign(clientLib, mixinMethods),
   });
 }
 
