@@ -5,12 +5,23 @@ Promise.config({ longStackTraces: true });
 global.Promise = Promise;
 
 const fp = require('lodash/fp');
-const { makeClient, makePool } = require('../../index');
+const keen = require('../../index');
 const pg = require('pg');
 const assert = require('assert');
 
-function defaultPool({ maxClients = 1 } = {}) {
-  return makePool({ makeClient: () => makeClient({ pg }), maxClients });
+function defaultPool({ max = 1 } = {}) {
+  const pool = keen.makePool({
+    pgClientClass: pg.Client,
+    max,
+  });
+  pool.query = keen.bindToPool(pool, (...args) =>
+    fp.last(args).query(...fp.initial(args)),
+  );
+  pool.queryRows = keen.returnsRows(pool.query);
+  pool.queryRow = keen.returnsRow(pool.query);
+  pool.withClient = (...args) => keen.withClient(pool, ...args);
+  pool.transaction = keen.bindToPool(pool, keen.transaction);
+  return pool;
 }
 
 suite('Client Pool', () => {
@@ -67,7 +78,7 @@ suite('Client Pool', () => {
       .then(([row]) => {
         assert.equal(row.foo_bar, 1);
       })
-      .then(() => db.queryOne('SELECT * from foo;'))
+      .then(() => db.queryRow('SELECT * from foo;'))
       .then(row => {
         assert.equal(row.foo_bar, 1);
       });
@@ -79,28 +90,28 @@ suite('Client Pool', () => {
       .transaction(client => {
         return client
           .query('INSERT INTO foo VALUES ($1)', [1])
-          .then(() => client.queryRows('SELECT * from foo;'))
-          .then(([row]) => {
+          .then(() => client.query('SELECT * from foo;'))
+          .then(({ rows: [row] }) => {
             assert.equal(row.foo_bar, 1);
           })
-          .then(() => client.queryOne('SELECT * from foo;'));
+          .then(() => client.query('SELECT * from foo;'));
       })
-      .then(row => {
+      .then(({ rows: [row] }) => {
         assert.equal(row.foo_bar, 1);
       });
   });
 
-  test('Throw error if queryOne returns multiple result rows', () => {
+  test('Throw error if queryRow returns multiple result rows', () => {
     db = defaultPool();
     return db
       .query('INSERT INTO foo VALUES (1), (2)')
-      .then(() => db.queryOne('SELECT * from foo;'))
+      .then(() => db.queryRow('SELECT * from foo;'))
       .then(
         () => {
           assert.fail('Expected an error');
         },
         err => {
-          assert.equal(err.message, 'Expected 0 or 1 row');
+          assert(fp.startsWith('Expected 0 or 1 row', err.message));
         },
       );
   });
@@ -112,7 +123,7 @@ suite('Client Pool', () => {
       .then(rows => {
         assert.equal(rows.length, 0);
       })
-      .then(() => db.queryOne('SELECT * from foo;'))
+      .then(() => db.queryRow('SELECT * from foo;'))
       .then(row => {
         assert.strictEqual(row, null);
       });
@@ -145,7 +156,7 @@ suite('Client Pool', () => {
   });
 
   test("don't deadlock when pool has enough clients", () => {
-    db = defaultPool({ maxClients: 2 });
+    db = defaultPool({ max: 2 });
     let gotFirstConnection = false;
     let gotSecondConnection = false;
 
@@ -182,7 +193,7 @@ suite('Client Pool', () => {
   });
 
   test("don't deadlock on sequential connection requests", () => {
-    db = defaultPool({ maxClients: 1 });
+    db = defaultPool({ max: 1 });
 
     const gotConnection = fp.map(() => {
       return false;
@@ -256,7 +267,7 @@ suite('Client Pool', () => {
   });
 
   test('write then read consistency', () => {
-    db = defaultPool({ maxClients: 10 });
+    db = defaultPool({ max: 10 });
     let counter = 0;
 
     const update = 'UPDATE fooid SET bar = bar+1 WHERE id = 0;';
