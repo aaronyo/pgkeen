@@ -10,15 +10,12 @@ const pg = require('pg');
 const assert = require('assert');
 
 function defaultPool({ max = 1 } = {}) {
-  const pool = keen.makePool({
-    pgClientClass: pg.Client,
-    max,
-  });
+  const pool = keen.makePool(pg.Client, { max });
   pool.query = keen.bindToPool(pool, (...args) =>
-    fp.last(args).query(...fp.initial(args)),
+    fp.first(args).query(...fp.tail(args)),
   );
-  pool.queryRows = keen.returnsRows(pool.query);
-  pool.queryRow = keen.returnsRow(pool.query);
+  pool.queryRows = async (...args) => keen.toRows(await pool.query(...args));
+  pool.queryRow = async (...args) => keen.toRow(await pool.query(...args));
   pool.withClient = (...args) => keen.withClient(pool, ...args);
   pool.transaction = keen.bindToPool(pool, keen.transaction);
   return pool;

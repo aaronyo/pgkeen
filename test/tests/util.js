@@ -12,15 +12,12 @@ const synchronized = require('../../lib/synchronized');
 
 suite('Util', () => {
   test('Synchronized', async () => {
-    const pool = keen.makePool({
-      pgClientClass: pg.Client,
-      max: 10,
-    });
+    const pool = keen.makePool(pg.Client, { max: 10 });
     const completionMarkers = [];
     const returns = await Promise.all([
       keen.withClient(
         pool,
-        fp.partial(synchronized, [
+        fp.partialRight(synchronized, [
           'lockA',
           async () => {
             await Promise.delay(200);
@@ -35,7 +32,7 @@ suite('Util', () => {
       Promise.delay(10).then(() => {
         return keen.withClient(
           pool,
-          fp.partial(synchronized, [
+          fp.partialRight(synchronized, [
             'lockA',
             () => {
               completionMarkers.push("a'");
@@ -46,7 +43,7 @@ suite('Util', () => {
       }),
       keen.withClient(
         pool,
-        fp.partial(synchronized, [
+        fp.partialRight(synchronized, [
           'lockB',
           () => {
             completionMarkers.push('b');

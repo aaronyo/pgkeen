@@ -9,99 +9,63 @@ const pg = require('pg');
 const keen = require('../../index');
 const assert = require('assert');
 
-async function query(sql, values, pgClient, opts) {
-  return pgClient.query({
-    text: sql,
-    values,
-    ...fp.omit(['text', 'values'], opts),
-  });
-}
-
-const func = sql => (...args) => query(sql, fp.initial(args), fp.last(args));
-
-async function namedParamsQuery(sql, namedParams, pgClient, opts) {
-  const { text, values } = keen.namedParamsToBindVars(sql, namedParams);
-  return pgClient.query({ text, values, ...fp.omit(['text', 'values'], opts) });
-}
-
-const namedParamsFunc = sql => (opts, pgClient) =>
-  namedParamsQuery(sql, opts, pgClient);
-
-function doInsert(val, pgClient) {
-  return pgClient.query('INSERT INTO foo VALUES($1)', [val]);
-}
-
-const doInsert2 = func('INSERT INTO foo VALUES ($1), ($2)');
-
-// function doInsert2a(val1, val2, pgClient) {
-//   pgClient.query('INSERT INTO foo VALUES ($1), ($2)', val1, val2);
-// }
-
-// function doInsert2b({ val1, val2 }, pgClient) {
-//   keen.namedParamsQuery('INSERT INTO foo VALUES (:val1), (:val2)', { val1, val2 }, pgClient);
-// }
-
-// const doInsert2c = namedParamsFunc('INSERT INTO foo VALUES (:val1), (:val2)');
-
-// const doInsert2d = namedParamsFunc(
-//   keen.readFileSync(__dirname, 'sql', 'count_foo.sql'),
-// );
-
-const doCount = keen.returnsScalar(
-  namedParamsFunc(keen.readFileSync(__dirname, 'sql', 'count_foo.sql')),
-);
-
-// bad return type
-async function doSelect(val, pgClient) {
-  return keen.asScalar(
-    await pgClient.query('SELECT * FROM foo WHERE val = $1', [val]),
-  );
-}
+const func = fp.partial(keen.func, [keen.query]);
 
 suite('Integration', () => {
-  let pool;
-
   function createTestTable() {
-    return keen.withClient(pool, pgClient =>
-      pgClient.query('CREATE TABLE foo (val int);'),
-    );
+    return keen.runQuery('CREATE TABLE foo (val int);', pg.Client);
   }
 
   function dropTestTable() {
-    return keen.withClient(pool, pgClient =>
-      pgClient.query('DROP TABLE IF EXISTS foo;'),
-    );
+    return keen.runQuery('DROP TABLE IF EXISTS foo', pg.Client);
   }
 
   setup(async () => {
-    if (pool) {
-      pool.drain();
-    }
-    pool = keen.makePool({
-      pgClientClass: pg.Client,
-      max: 3,
-    });
     await dropTestTable();
     await createTestTable();
   });
 
   test('Use a sql file', async () => {
-    const bound = keen.bindAllToPool(pool, { doInsert, doCount });
-    await bound.doInsert(1);
-    const result = await bound.doCount({ val: 1 });
-    assert.equal(result, 1);
-  });
+    async function insert(pgClient, val) {
+      await pgClient.query('INSERT INTO foo VALUES($1)', [val]);
+    }
 
-  test('Throws error on bad return type', async () => {
-    const bound = keen.bindAllToPool(pool, { doInsert2, doSelect });
-    await bound.doInsert2(1, 1);
-    let failed = false;
+    const values = func('SELECT * from foo', keen.toScalars);
+
+    async function count(pgClient, { val }) {
+      return keen.toScalar(
+        await pgClient.query(
+          ...keen.toBindVars(
+            keen.readFileSync(__dirname, 'sql', 'count_foo.sql'),
+            { val },
+          ),
+        ),
+      );
+    }
+
+    async function badConversion(pgClient) {
+      return keen.toScalar(await pgClient.query('SELECT * from FOO'));
+    }
+
+    const pool = keen.makePool(pg.Client);
+    const bound = keen.bindAllToPool(pool, {
+      insert,
+      count,
+      values,
+      badConversion,
+    });
+    await bound.insert(1);
+    await bound.insert(1);
+    assert.equal(await bound.count({ val: 1 }), 2);
+    assert.deepEqual(await bound.values(), [1, 1]);
+
+    let conversionFailed = false;
     try {
-      await bound.doSelect(1);
+      await bound.badConversion(1);
       throw new Error('should have failed');
     } catch (e) {
-      failed = true;
+      conversionFailed = true;
     }
-    assert(failed);
+    assert(conversionFailed);
   });
 });
