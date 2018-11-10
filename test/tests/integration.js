@@ -5,28 +5,50 @@ Promise.config({ longStackTraces: true });
 global.Promise = Promise;
 
 const fp = require('lodash/fp');
-const fs = require('fs');
-const path = require('path');
 const pg = require('pg');
 const keen = require('../../index');
 const assert = require('assert');
 
-async function query(sql, args, pgClient) {
-  return pgClient.query(...keen.toBindVars(sql, args));
+async function query(sql, values, pgClient, opts) {
+  return pgClient.query({
+    text: sql,
+    values,
+    ...fp.omit(['text', 'values'], opts),
+  });
 }
 
 const func = sql => (...args) => query(sql, fp.initial(args), fp.last(args));
-const namesFunc = sql => (opts, pgClient) => query(sql, opts, pgClient);
 
-const doInsert = keen.returnsScalar(func('INSERT INTO foo VALUES($1)'));
+async function namedParamsQuery(sql, namedParams, pgClient, opts) {
+  const { text, values } = keen.namedParamsToBindVars(sql, namedParams);
+  return pgClient.query({ text, values, ...fp.omit(['text', 'values'], opts) });
+}
+
+const namedParamsFunc = sql => (opts, pgClient) =>
+  namedParamsQuery(sql, opts, pgClient);
+
+function doInsert(val, pgClient) {
+  return pgClient.query('INSERT INTO foo VALUES($1)', [val]);
+}
+
+const doInsert2 = func('INSERT INTO foo VALUES ($1), ($2)');
+
+// function doInsert2a(val1, val2, pgClient) {
+//   pgClient.query('INSERT INTO foo VALUES ($1), ($2)', val1, val2);
+// }
+
+// function doInsert2b({ val1, val2 }, pgClient) {
+//   keen.namedParamsQuery('INSERT INTO foo VALUES (:val1), (:val2)', { val1, val2 }, pgClient);
+// }
+
+// const doInsert2c = namedParamsFunc('INSERT INTO foo VALUES (:val1), (:val2)');
+
+// const doInsert2d = namedParamsFunc(
+//   keen.readFileSync(__dirname, 'sql', 'count_foo.sql'),
+// );
 
 const doCount = keen.returnsScalar(
-  namesFunc(
-    fs.readFileSync(path.join(__dirname, 'sql', 'count_foo.sql'), 'utf8'),
-    {
-      val: 1,
-    },
-  ),
+  namedParamsFunc(keen.readFileSync(__dirname, 'sql', 'count_foo.sql')),
 );
 
 // bad return type
@@ -71,9 +93,8 @@ suite('Integration', () => {
   });
 
   test('Throws error on bad return type', async () => {
-    const bound = keen.bindAllToPool(pool, { doInsert, doSelect });
-    await bound.doInsert(1);
-    await bound.doInsert(1);
+    const bound = keen.bindAllToPool(pool, { doInsert2, doSelect });
+    await bound.doInsert2(1, 1);
     let failed = false;
     try {
       await bound.doSelect(1);
