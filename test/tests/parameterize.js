@@ -3,10 +3,7 @@ const Promise = require('bluebird');
 
 Promise.config({ longStackTraces: true });
 
-const {
-  extractNamedParams,
-  namedParamsToBindVars: toBindVars,
-} = require('../../lib/parameterize');
+const { extractNamedParams, toBindVars } = require('../../lib/parameterize');
 const assert = require('assert');
 
 suite('Parameterized queries', () => {

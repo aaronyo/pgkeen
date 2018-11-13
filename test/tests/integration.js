@@ -4,48 +4,75 @@ const Promise = require('bluebird');
 Promise.config({ longStackTraces: true });
 global.Promise = Promise;
 
+const fp = require('lodash/fp');
 const pg = require('pg');
-const pgkeen = require('../../index');
+const keen = require('../../index');
 const assert = require('assert');
-const path = require('path');
 
-const sqlFiles = pgkeen.makeSqlLoader(path.join(__dirname, 'sql'));
-
-async function query({ pgClient }, ...args) {
-  return pgkeen.client.query(
-    { pgClient },
-    ...pgkeen.parameterize.namedParamsToBindVars(...args),
-  );
-}
+const queryFunc = fp.partial(keen.queryFunc, [keen.query]);
+const namedParamsQueryFunc = fp.partial(keen.namedParamsQueryFunc, [
+  keen.query,
+]);
 
 suite('Integration', () => {
-  let pool;
-
   function createTestTable() {
-    return pool.query('CREATE TABLE foo (val int);');
+    return keen.run(pg.Client, 'CREATE TABLE foo (val int);');
   }
 
   function dropTestTable() {
-    return pool.query('DROP TABLE IF EXISTS foo;');
+    return keen.run(pg.Client, 'DROP TABLE IF EXISTS foo');
   }
 
   setup(async () => {
-    if (pool) {
-      pool.drain();
-    }
-    pool = pgkeen.makePool({
-      makeClient: () => pgkeen.makeClient({ pg, mixinMethods: { query } }),
-      maxClients: 3,
-    });
     await dropTestTable();
     await createTestTable();
   });
 
-  test('Use a sql file', async () => {
-    await pool.query('INSERT INTO foo VALUES(:val)', { val: 1 });
-    const result = await pool.queryOne(await sqlFiles.get('count_foo.sql'), {
-      val: 1,
+  test('Use various query functions thar are bound to a pool', async () => {
+    // Create functions that perform db queries. We can build these functions
+    // in a veriety of ways, but note that they all expect a plain old node-pg
+    // client as their first argument.
+    async function insert(queryable, val) {
+      await queryable.query('INSERT INTO foo VALUES($1)', [val]);
+    }
+
+    const values = queryFunc('SELECT * from foo', keen.toScalars);
+
+    const count = namedParamsQueryFunc(
+      await keen.readFileSync(__dirname, 'sql', 'count_foo.sql'),
+      keen.toScalar,
+    );
+
+    async function badConversion(queryable) {
+      return keen.toScalar(await queryable.query('SELECT * from FOO'));
+    }
+
+    // Make a pool of node pg clients
+    const pool = keen.makePool(pg.Client);
+
+    // Create versions of the functions that will automatically be called
+    // against a client from the pool
+    const bound = fp.mapValues(keen.bindToQueryable(pool), {
+      insert,
+      count,
+      values,
+      badConversion,
     });
-    assert.equal(result.count, 1);
+
+    // Now we can use the bound functions
+    await bound.insert(1);
+    await bound.insert(1);
+    assert.equal(await bound.count({ val: 1 }), 2);
+    assert.deepEqual(await bound.values(), [1, 1]);
+
+    let conversionFailed = false;
+    try {
+      await bound.badConversion(1);
+      throw new Error('should have failed');
+    } catch (err) {
+      assert(fp.startsWith('Expected 0 or 1 row', err.message));
+      conversionFailed = true;
+    }
+    assert(conversionFailed);
   });
 });
