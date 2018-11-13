@@ -9,16 +9,18 @@ const pg = require('pg');
 const keen = require('../../index');
 const assert = require('assert');
 
-const func = fp.partial(keen.func, [keen.query]);
-const namedParamsFunc = fp.partial(keen.namedParamsFunc, [keen.query]);
+const queryFunc = fp.partial(keen.queryFunc, [keen.query]);
+const namedParamsQueryFunc = fp.partial(keen.namedParamsQueryFunc, [
+  keen.query,
+]);
 
 suite('Integration', () => {
   function createTestTable() {
-    return keen.runQuery('CREATE TABLE foo (val int);', pg.Client);
+    return keen.run(pg.Client, 'CREATE TABLE foo (val int);');
   }
 
   function dropTestTable() {
-    return keen.runQuery('DROP TABLE IF EXISTS foo', pg.Client);
+    return keen.run(pg.Client, 'DROP TABLE IF EXISTS foo');
   }
 
   setup(async () => {
@@ -30,19 +32,19 @@ suite('Integration', () => {
     // Create functions that perform db queries. We can build these functions
     // in a veriety of ways, but note that they all expect a plain old node-pg
     // client as their first argument.
-    async function insert(pgClient, val) {
-      await pgClient.query('INSERT INTO foo VALUES($1)', [val]);
+    async function insert(queryable, val) {
+      await queryable.query('INSERT INTO foo VALUES($1)', [val]);
     }
 
-    const values = func('SELECT * from foo', keen.toScalars);
+    const values = queryFunc('SELECT * from foo', keen.toScalars);
 
-    const count = namedParamsFunc(
+    const count = namedParamsQueryFunc(
       await keen.readFileSync(__dirname, 'sql', 'count_foo.sql'),
       keen.toScalar,
     );
 
-    async function badConversion(pgClient) {
-      return keen.toScalar(await pgClient.query('SELECT * from FOO'));
+    async function badConversion(queryable) {
+      return keen.toScalar(await queryable.query('SELECT * from FOO'));
     }
 
     // Make a pool of node pg clients
@@ -50,7 +52,7 @@ suite('Integration', () => {
 
     // Create versions of the functions that will automatically be called
     // against a client from the pool
-    const bound = keen.bindAllToPool(pool, {
+    const bound = fp.mapValues(keen.bindToQueryable(pool), {
       insert,
       count,
       values,
