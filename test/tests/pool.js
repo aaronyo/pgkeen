@@ -9,8 +9,10 @@ const keen = require('../../index');
 const pg = require('pg');
 const assert = require('assert');
 
+const URL = 'postgres://localhost:5432/postgres';
+
 function defaultPool({ max = 1 } = {}) {
-  const pool = keen.makePool(pg.Client, { max });
+  const pool = keen.makePool(pg.Client, { url: URL }, { max });
   pool.query = keen.bindToQueryable(pool, (...args) => {
     return fp.first(args).query(...fp.tail(args));
   });

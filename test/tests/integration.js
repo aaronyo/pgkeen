@@ -14,13 +14,15 @@ const namedParamsQueryFunc = fp.partial(keen.namedParamsQueryFunc, [
   keen.query,
 ]);
 
+const URL = 'postgres://localhost:5432/postgres';
+
 suite('Integration', () => {
   function createTestTable() {
-    return keen.run(pg.Client, 'CREATE TABLE foo (val int);');
+    return keen.run(pg.Client, 'CREATE TABLE foo (val int);', URL);
   }
 
   function dropTestTable() {
-    return keen.run(pg.Client, 'DROP TABLE IF EXISTS foo');
+    return keen.run(pg.Client, 'DROP TABLE IF EXISTS foo', URL);
   }
 
   setup(async () => {
@@ -48,7 +50,7 @@ suite('Integration', () => {
     }
 
     // Make a pool of node pg clients
-    const pool = keen.makePool(pg.Client);
+    const pool = keen.makePool(pg.Client, { url: URL });
 
     // Create versions of the functions that will automatically be called
     // against a client from the pool

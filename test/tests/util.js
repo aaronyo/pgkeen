@@ -10,9 +10,11 @@ const assert = require('assert');
 
 const synchronized = require('../../lib/synchronized');
 
+const URL = 'postgres://localhost:5432/postgres';
+
 suite('Util', () => {
   test('Synchronized', async () => {
-    const pool = keen.makePool(pg.Client, { max: 10 });
+    const pool = keen.makePool(pg.Client, { url: URL }, { max: 10 });
     const completionMarkers = [];
     const returns = await Promise.all([
       keen.withClient(
