@@ -1,6 +1,6 @@
 {
   "name": "pgkeen",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A minimal, promise based api that simplifies use of node pg and adds a couple features typically found in db drivers, like transactions.",
   "main": "index.js",
   "scripts": {
