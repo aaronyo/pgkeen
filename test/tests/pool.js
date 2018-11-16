@@ -13,22 +13,22 @@ const URL = 'postgres://localhost:5432/postgres';
 
 function defaultPool({ max = 1 } = {}) {
   const pool = keen.makePool(pg.Client, { url: URL }, { max });
-  pool.query = keen.bindToQueryable(pool, (...args) => {
+  pool.query = keen.bindQueryable(pool, (...args) => {
     return fp.first(args).query(...fp.tail(args));
   });
   pool.queryRows = async (...args) => keen.toRows(await pool.query(...args));
   pool.queryRow = async (...args) => keen.toRow(await pool.query(...args));
-  pool.withClient = (...args) => keen.withClient(pool, ...args);
-  pool.transaction = keen.bindToClient(pool, keen.transaction);
+  pool.withConnection = (...args) => keen.withConnection(pool, ...args);
+  pool.transaction = keen.bindConnection(pool, keen.transaction);
   return pool;
 }
 
-suite('Client Pool', () => {
+suite('Connection/Client Pool', () => {
   let db;
 
   function createTestTable() {
     return db
-      .withClient(conn => {
+      .withConnection(conn => {
         return Promise.all([
           conn.query('CREATE TABLE foo (foo_bar int);'),
           conn.query('CREATE TABLE fooid (id int, bar int);'),
@@ -39,7 +39,7 @@ suite('Client Pool', () => {
 
   function dropTestTable() {
     return db
-      .withClient(conn => {
+      .withConnection(conn => {
         return Promise.all([
           conn.query('DROP TABLE IF EXISTS foo;', []),
           conn.query('DROP TABLE IF EXISTS fooid;', []),
@@ -64,7 +64,7 @@ suite('Client Pool', () => {
       .catch(done);
   });
 
-  test('Use a db client', () => {
+  test('Use a db connection', () => {
     db = defaultPool();
     return db.query('select 1');
   });
@@ -86,14 +86,14 @@ suite('Client Pool', () => {
   test('Insert a row and select it -- in a transaction', () => {
     db = defaultPool();
     return db
-      .transaction(client => {
-        return client
+      .transaction(conn => {
+        return conn
           .query('INSERT INTO foo VALUES ($1)', [1])
-          .then(() => client.query('SELECT * from foo;'))
+          .then(() => conn.query('SELECT * from foo;'))
           .then(({ rows: [row] }) => {
             assert.equal(row.foo_bar, 1);
           })
-          .then(() => client.query('SELECT * from foo;'));
+          .then(() => conn.query('SELECT * from foo;'));
       })
       .then(({ rows: [row] }) => {
         assert.equal(row.foo_bar, 1);
@@ -134,9 +134,9 @@ suite('Client Pool', () => {
     let gotSecondConnection = false;
 
     function grab2Conns() {
-      return db.withClient(() => {
+      return db.withConnection(() => {
         gotFirstConnection = true;
-        return db.withClient(() => {
+        return db.withConnection(() => {
           gotSecondConnection = true;
           return Promise.resolve();
         });
@@ -154,15 +154,15 @@ suite('Client Pool', () => {
     ]);
   });
 
-  test("don't deadlock when pool has enough clients", () => {
+  test("don't deadlock when pool has enough connections", () => {
     db = defaultPool({ max: 2 });
     let gotFirstConnection = false;
     let gotSecondConnection = false;
 
     function grab2Conns() {
-      return db.withClient(() => {
+      return db.withConnection(() => {
         gotFirstConnection = true;
-        return db.withClient(() => {
+        return db.withConnection(() => {
           gotSecondConnection = true;
           return Promise.resolve();
         });
@@ -181,7 +181,7 @@ suite('Client Pool', () => {
 
     return Promise.all(
       fp.map(i => {
-        return db.withClient(() => {
+        return db.withConnection(() => {
           gotConnection[i] = true;
           return Promise.delay(20);
         });
@@ -199,18 +199,18 @@ suite('Client Pool', () => {
     }, fp.range(0, 3));
 
     return db
-      .withClient(() => {
+      .withConnection(() => {
         gotConnection[0] = true;
         return Promise.delay(20);
       })
       .then(() => {
-        return db.withClient(() => {
+        return db.withConnection(() => {
           gotConnection[1] = true;
           return Promise.delay(20);
         });
       })
       .then(() => {
-        return db.withClient(() => {
+        return db.withConnection(() => {
           gotConnection[2] = true;
           return Promise.delay(20);
         });
@@ -253,7 +253,7 @@ suite('Client Pool', () => {
   test('raw connection does not auto rollback', () => {
     db = defaultPool();
     return db
-      .withClient(conn => {
+      .withConnection(conn => {
         return conn
           .query('INSERT INTO foo VALUES (DEFAULT);')
           .then(() => conn.query('bogus'));

@@ -32,8 +32,8 @@ suite('Integration', () => {
 
   test('Use various query functions thar are bound to a pool', async () => {
     // Create functions that perform db queries. We can build these functions
-    // in a veriety of ways, but note that they all expect a plain old node-pg
-    // client as their first argument.
+    // in a veriety of ways, but note that they all expect a queryable
+    // as their first argument.
     async function insert(queryable, val) {
       await queryable.query('INSERT INTO foo VALUES($1)', [val]);
     }
@@ -54,7 +54,7 @@ suite('Integration', () => {
 
     // Create versions of the functions that will automatically be called
     // against a client from the pool
-    const bound = fp.mapValues(keen.bindToQueryable(pool), {
+    const bound = fp.mapValues(keen.bindQueryable(pool), {
       insert,
       count,
       values,

@@ -17,7 +17,7 @@ suite('Util', () => {
     const pool = keen.makePool(pg.Client, { url: URL }, { max: 10 });
     const completionMarkers = [];
     const returns = await Promise.all([
-      keen.withClient(
+      keen.withConnection(
         pool,
         fp.partialRight(synchronized, [
           'lockA',
@@ -32,7 +32,7 @@ suite('Util', () => {
       // first, so we stick a delay here to make it much more likely that
       // the first statement will.
       Promise.delay(10).then(() => {
-        return keen.withClient(
+        return keen.withConnection(
           pool,
           fp.partialRight(synchronized, [
             'lockA',
@@ -43,7 +43,7 @@ suite('Util', () => {
           ]),
         );
       }),
-      keen.withClient(
+      keen.withConnection(
         pool,
         fp.partialRight(synchronized, [
           'lockB',
