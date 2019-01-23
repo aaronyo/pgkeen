@@ -54,7 +54,7 @@ suite('Integration', () => {
 
     // Create versions of the functions that will automatically be called
     // against a client from the pool
-    const bound = fp.mapValues(keen.bindQueryable(pool), {
+    const bound = fp.mapValues(keen.bindToPool(pool), {
       insert,
       count,
       values,
@@ -76,5 +76,19 @@ suite('Integration', () => {
       conversionFailed = true;
     }
     assert(conversionFailed);
+
+    const transaction = keen.poolTransaction(pool);
+    let insideValues;
+    try {
+      await transaction(async conn => {
+        await insert(conn, 1);
+        insideValues = await values(conn);
+        throw new Error();
+      });
+    } catch (err) {
+      assert(true);
+    }
+    assert.deepEqual(insideValues, [1, 1, 1]);
+    assert.deepEqual(await bound.values(), [1, 1]);
   });
 });
