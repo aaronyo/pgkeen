@@ -1,0 +1,5 @@
+#!/bin/bash
+my_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+$my_dir/prettier --write \
+  `find . -name "*.js" ! -path "*/node_modules*" ! -name "*.ready.js"`
