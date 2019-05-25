@@ -13,10 +13,11 @@ const URL = 'postgres://localhost:5432/postgres';
 
 function defaultPool({ max = 1 } = {}) {
   const pool = keen.makePool(pg.Client, { url: URL }, { max });
-  pool.queryRows = async (...args) => keen.toRows(await pool.query(...args));
-  pool.queryRow = async (...args) => keen.toRow(await pool.query(...args));
+  pool.query = async (...args) => keen.poolQuery(pool, ...args);
+  pool.queryRows = async (...args) => keen.asRows(await pool.query(...args));
+  pool.queryRow = async (...args) => keen.asRow(await pool.query(...args));
   pool.withConnection = (...args) => keen.withConnection(pool, ...args);
-  pool.transaction = keen.poolTransaction(pool);
+  pool.transaction = (...args) => keen.poolTransaction(pool, ...args);
   return pool;
 }
 

@@ -38,15 +38,15 @@ suite('Integration', () => {
       await queryable.query('INSERT INTO foo VALUES($1)', [val]);
     }
 
-    const values = queryFunc('SELECT * from foo', keen.toScalars);
+    const values = queryFunc('SELECT * from foo', keen.asScalars);
 
     const count = namedParamsQueryFunc(
       await keen.readFileSync(__dirname, 'sql', 'count_foo.sql'),
-      keen.toScalar,
+      keen.asScalar,
     );
 
     async function badConversion(queryable) {
-      return keen.toScalar(await queryable.query('SELECT * from FOO'));
+      return keen.asScalar(await queryable.query('SELECT * from FOO'));
     }
 
     // Make a pool of node pg clients
@@ -77,10 +77,9 @@ suite('Integration', () => {
     }
     assert(conversionFailed);
 
-    const transaction = keen.poolTransaction(pool);
     let insideValues;
     try {
-      await transaction(async conn => {
+      await keen.poolTransaction(pool, async conn => {
         await insert(conn, 1);
         insideValues = await values(conn);
         throw new Error();
