@@ -26,6 +26,7 @@
     "eslint": "^5.16.0",
     "generic-pool": "^3.4.2",
     "lodash": "^4.17.4",
-    "pg-connection-string": "^0.1.3"
+    "pg-connection-string": "^0.1.3",
+    "pg-cursor": "^2.0.0"
   }
 }
