@@ -1,5 +1,6 @@
 /* global suite: false, test: false, */
 const Promise = require('bluebird');
+const fp = require('lodash/fp');
 
 Promise.config({ longStackTraces: true });
 
@@ -8,10 +9,16 @@ const assert = require('assert');
 
 suite('Parameterized queries', () => {
   test('Extract params', async () => {
-    assert.deepEqual(extractNamedParams('SELECT 1 FROM foo WHERE val = :val'), {
-      text: 'SELECT 1 FROM foo WHERE val = $1',
-      names: ['val'],
-    });
+    assert.deepEqual(
+      fp.pick(
+        ['text', 'names'],
+        extractNamedParams('SELECT 1 FROM foo WHERE val = :val'),
+      ),
+      {
+        text: 'SELECT 1 FROM foo WHERE val = $1',
+        names: ['val'],
+      },
+    );
   });
 
   test('Replace params', async () => {

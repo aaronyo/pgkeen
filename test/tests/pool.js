@@ -17,7 +17,8 @@ function defaultPool({ max = 1 } = {}) {
   pool.queryRows = async (...args) => keen.asRows(await pool.query(...args));
   pool.queryRow = async (...args) => keen.asRow(await pool.query(...args));
   pool.withConnection = (...args) => keen.withConnection(pool, ...args);
-  pool.transaction = (...args) => keen.poolTransaction(pool, ...args);
+  pool.transaction = (...args) =>
+    keen.withTransaction(...args, pool.withConnection);
   return pool;
 }
 

@@ -9,10 +9,8 @@ const pg = require('pg');
 const keen = require('../../index');
 const assert = require('assert');
 
-const queryFunc = fp.partial(keen.queryFunc, [keen.query]);
-const namedParamsQueryFunc = fp.partial(keen.namedParamsQueryFunc, [
-  keen.query,
-]);
+const queryFunc = keen.queryFunc;
+const namedParamsQueryFunc = keen.namedParamsQueryFunc;
 
 const URL = 'postgres://localhost:5432/postgres';
 
@@ -79,11 +77,11 @@ suite('Integration', () => {
 
     let insideValues;
     try {
-      await keen.poolTransaction(pool, async conn => {
+      await keen.withTransaction(async conn => {
         await insert(conn, 1);
         insideValues = await values(conn);
         throw new Error();
-      });
+      }, fp.partial(keen.withConnection, [pool]));
     } catch (err) {
       assert(true);
     }
